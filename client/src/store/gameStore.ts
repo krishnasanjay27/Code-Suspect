@@ -1,59 +1,30 @@
 import { create } from 'zustand'
+import type { Player, Room, PlayerRole } from '../types/game.js'
 
-type Player = {
-  id: string
-  nickname: string
-  color: string
-  isHost: boolean
-  isAlive: boolean
-  joinedAt: number
-}
-
-type Room = {
-  id: string
-  hostId: string
-  phase: 'lobby' | 'playing' | 'finished'
-  players: Player[]
-}
-
-type GameStore = {
+interface GameState {
   connected: boolean
-  setConnected: (val: boolean) => void
-
   player: Player | null
-  setPlayer: (player: Player | null) => void
-
   room: Room | null
-  setRoom: (room: Room | null) => void
+  role: PlayerRole
 
-  updateRoom: (updatedRoom: Room) => void
-
+  setConnected: (val: boolean) => void
+  setPlayer: (player: Player) => void
+  setRoom: (room: Room) => void
+  setRole: (role: PlayerRole) => void
   reset: () => void
 }
 
-const useGameStore = create<GameStore>((set) => ({
-  // connection
+const useGameStore = create<GameState>((set) => ({
   connected: false,
-  setConnected: (val) => set({ connected: val }),
-
-  // this player
   player: null,
-  setPlayer: (player) => set({ player }),
-
-  // room
   room: null,
+  role: null,
+
+  setConnected: (val) => set({ connected: val }),
+  setPlayer: (player) => set({ player }),
   setRoom: (room) => set({ room }),
-
-  // update just the player list inside room (common operation)
-  updateRoom: (updatedRoom) => set({ room: updatedRoom }),
-
-  // clear everything (on leave / game over)
-  reset: () =>
-    set({
-      connected: false,
-      player: null,
-      room: null
-    })
+  setRole: (role) => set({ role }),
+  reset: () => set({ connected: false, player: null, room: null, role: null }),
 }))
 
 export default useGameStore
