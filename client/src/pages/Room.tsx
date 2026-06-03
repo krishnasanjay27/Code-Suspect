@@ -27,7 +27,8 @@ const TEXT_CLASS: Record<string, string> = {
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
-  const { room, player, setRoom } = useGameStore()
+  const room = useGameStore(s => s.room)
+  const player = useGameStore(s => s.player)
   const [copied, setCopied] = useState(false)
   const [starting, setStarting] = useState(false)
 
@@ -35,35 +36,8 @@ export default function Room() {
   const canStart = (room?.players.length ?? 0) >= 2
 
   useEffect(() => {
-    // guard: if state is missing (e.g. page refresh) go back to lobby
     if (!room || !player) {
       navigate('/')
-      return
-    }
-
-    socket.on('player_joined', ({ room: r }: { room: Room }) => {
-      setRoom(r)
-    })
-
-    socket.on('player_left', ({ room: r }: { room: Room }) => {
-      setRoom(r)
-    })
-
-    socket.on('host_changed', ({ newHost }: { newHost: Player }) => {
-      // update room so the new host sees the Start button
-      setRoom(prev => prev ? { ...prev, hostId: newHost.id } : prev)
-    })
-
-    socket.on('game_started', ({ room: r }: { room: Room }) => {
-      setRoom(r)
-      navigate(`/room/${roomId}/game`)
-    })
-
-    return () => {
-      socket.off('player_joined')
-      socket.off('player_left')
-      socket.off('host_changed')
-      socket.off('game_started')
     }
   }, [])
 
@@ -203,7 +177,7 @@ function PlayerRow({
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       {/* colored dot */}
-      <div className={`w-4 h-4 rounded-full flex-shrink-0 ${COLOR_CLASS[player.color] ?? 'bg-gray-400'}`} />
+      <div className={`w-4 h-4 rounded-full shrink-0 ${COLOR_CLASS[player.color] ?? 'bg-gray-400'}`} />
 
       {/* nickname */}
       <span className={`flex-1 text-sm font-bold tracking-wide ${TEXT_CLASS[player.color] ?? 'text-gray-700'}`}>
