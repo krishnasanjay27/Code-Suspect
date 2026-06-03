@@ -78,6 +78,22 @@ io.on('connection', (socket: Socket) => {
     }
   )
 
+  // Start GAME
+
+  socket.on('start_game', ({ roomId }: { roomId: string }) => {
+  const room = getRoom(roomId)
+  if (!room) return
+  if (room.hostId !== socket.id) return // only host can start
+  if (room.players.size < 2) return     // need at least 2 players
+
+  room.phase = 'role_reveal'
+
+  // broadcast to everyone in the room including host
+  io.to(roomId).emit('game_started', {
+    room: serializeRoom(room)
+  })
+})
+
   // ─── DISCONNECTING ─────────────────────────────────────────
   socket.on('disconnecting', () => {
     const result = removePlayer(socket.id)

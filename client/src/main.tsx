@@ -11,6 +11,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<Lobby />} />
         <Route path="/room/:roomId" element={<Room />} />
+        <Route path="/room/:roomId/game" element={<div className="text-white p-8 font-mono">Game screen coming in Phase 3</div>} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

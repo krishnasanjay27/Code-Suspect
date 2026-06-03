@@ -9,7 +9,7 @@ interface GameState {
 
   setConnected: (val: boolean) => void
   setPlayer: (player: Player) => void
-  setRoom: (room: Room) => void
+  setRoom: (roomOrUpdater: Room | ((prev: Room | null) => Room | null)) => void
   setRole: (role: PlayerRole) => void
   reset: () => void
 }
@@ -22,7 +22,12 @@ const useGameStore = create<GameState>((set) => ({
 
   setConnected: (val) => set({ connected: val }),
   setPlayer: (player) => set({ player }),
-  setRoom: (room) => set({ room }),
+  setRoom: (roomOrUpdater: Room | ((prev: Room | null) => Room | null)) =>
+    set((state) => ({
+      room: typeof roomOrUpdater === 'function'
+        ? roomOrUpdater(state.room)
+        : roomOrUpdater
+    })),
   setRole: (role) => set({ role }),
   reset: () => set({ connected: false, player: null, room: null, role: null }),
 }))

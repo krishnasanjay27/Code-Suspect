@@ -17,7 +17,7 @@ type Player = {
 type Room = {
   id: string
   hostId: string
-  phase: 'lobby' | 'playing' | 'finished'
+  phase: 'lobby' | 'role_reveal' | 'coding' | 'discussion' | 'voting' | 'result'
   code: string
   players: Map<string, Player>
   createdAt: number
