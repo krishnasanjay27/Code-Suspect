@@ -1,27 +1,10 @@
 import { nanoid } from 'nanoid'
+import type { Player, Room, PlayerRole, PlayerColor } from './types.js'
 
 // Master rooms map — everything lives here
 // roomId => {
 //   id, code, hostId, phase, players: Map(socketId => playerObj), createdAt
 // }
-
-type Player = {
-  id: string
-  nickname: string
-  color: string
-  isHost: boolean
-  isAlive: boolean
-  joinedAt: number
-}
-
-type Room = {
-  id: string
-  hostId: string
-  phase: 'lobby' | 'role_reveal' | 'coding' | 'discussion' | 'voting' | 'result'
-  code: string
-  players: Map<string, Player>
-  createdAt: number
-}
 
 const rooms = new Map<string, Room>()
 
@@ -47,6 +30,7 @@ function createRoom(hostSocket: any, nickname: string) {
     hostId: hostSocket.id,
     phase: 'lobby',
     code: '',
+    round: 1,
     players: new Map([[hostSocket.id, player]]),
     createdAt: Date.now()
   })
@@ -133,15 +117,47 @@ function serializeRoom(room: Room) {
     id: room.id,
     hostId: room.hostId,
     phase: room.phase,
-    players: [...room.players.values()]
+    round: room.round,
+    players: [...room.players.values()].map(p => ({
+      id: p.id,
+      nickname: p.nickname,
+      color: p.color,
+      isHost: p.isHost,
+      isAlive: p.isAlive,
+      // role is intentionally omitted here
+    }))
   }
 }
 
 // Red, Blue, Green, Orange, Purple, Teal — matches the screenshot palette
-const COLORS = ['red', 'blue', 'green', 'orange', 'purple', 'teal']
+const COLORS: PlayerColor[] = ['red', 'blue', 'green', 'orange', 'purple', 'teal']
 
-function assignColor(index: number) {
+function assignColor(index: number): PlayerColor {
   return COLORS[index % COLORS.length]
+}
+
+function assignRoles(roomId: string): Map<string, PlayerRole> | null {
+  const room = rooms.get(roomId)
+  if (!room) return null
+
+  const playerIds = [...room.players.keys()]
+
+  // pick one random index — this is the saboteur
+  const saboteurIndex = Math.floor(Math.random() * playerIds.length)
+
+  const assignments = new Map<string, PlayerRole>()
+
+  playerIds.forEach((id, index) => {
+    const role: PlayerRole = index === saboteurIndex ? 'saboteur' : 'debugger'
+    assignments.set(id, role)
+
+    // store role on the player object server-side
+    // we NEVER send this to other players — only used for validation
+    const player = room.players.get(id)!
+    player.role = role
+  })
+
+  return assignments
 }
 
 export {
@@ -150,5 +166,6 @@ export {
   removePlayer,
   getRoom,
   getRoomBySocketId,
-  serializeRoom
+  serializeRoom,
+  assignRoles
 }
