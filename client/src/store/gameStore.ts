@@ -19,8 +19,10 @@ interface GameState {
   totalRounds: number    // always 4
   code: string           // current shared code
   changeLog: ChangeEntry[]
+  pendingNavigation: string | null
 
   // ─── Actions ─────────────────────────────────
+  setPendingNavigation: (path: string | null) => void
   setConnected: (val: boolean) => void
   setPlayer: (player: Player) => void
   setRole: (role: PlayerRole) => void
@@ -53,6 +55,7 @@ const initialState = {
   totalRounds: 4,
   code: '',
   changeLog: [],
+  pendingNavigation: null as string | null,
 }
 
 const useGameStore = create<GameState>((set) => ({
@@ -69,6 +72,7 @@ const useGameStore = create<GameState>((set) => ({
         : roomOrUpdater,
     })),
 
+  setPendingNavigation: (path) => set({ pendingNavigation: path }),
   setPhase: (phase) => set({ phase }),
   setTimer: (timer) => set({ timer }),
   setRound: (round) => set({ round }),

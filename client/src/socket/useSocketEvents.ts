@@ -2,15 +2,13 @@ import { useEffect } from 'react'
 import socket from './socket.js'
 import useGameStore from '../store/gameStore.js'
 import type { Room, Player, PlayerRole, GamePhase } from '../types/game.js'
-import { useNavigate } from 'react-router-dom'
 import type { ChangeEntry } from '../store/gameStore.js'
 
 export function useSocketEvents() {
-  const navigate = useNavigate()
   const {
     setConnected, setRoom, setPhase,
     setTimer, setRole, setRound, setCode,
-    addChangeEntry
+    addChangeEntry, setPendingNavigation
   } = useGameStore()
 
   useEffect(() => {
@@ -35,7 +33,7 @@ export function useSocketEvents() {
     socket.on('game_started', ({ room }: { room: Room }) => {
       setRoom(room)
       setPhase('role_reveal')
-      navigate(`/room/${room.id}/game`)
+      setPendingNavigation(`/room/${room.id}/role-reveal`)
     })
 
     socket.on('role_assigned', ({ role }: { role: PlayerRole }) => {
