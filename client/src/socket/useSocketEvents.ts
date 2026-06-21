@@ -13,7 +13,7 @@ export function useSocketEvents() {
 
   useEffect(() => {
     // ─── Connection ──────────────────────────────────────────
-    socket.on('connect',    () => setConnected(true))
+    socket.on('connect', () => setConnected(true))
     socket.on('disconnect', () => setConnected(false))
 
     // ─── Room events ─────────────────────────────────────────
@@ -40,9 +40,14 @@ export function useSocketEvents() {
       setRole(role)
     })
 
-    socket.on('phase_changed', ({ phase, round }: { phase: GamePhase; round: number }) => {
+    socket.on('phase_changed', ({ phase, round, duration }: {
+      phase: GamePhase
+      round: number
+      duration: number | null
+    }) => {
       setPhase(phase)
       setRound(round)
+      setTimer(duration ?? 0)
     })
 
     socket.on('timer_tick', ({ seconds }: { seconds: number }) => {

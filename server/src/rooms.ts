@@ -1,10 +1,19 @@
 import { nanoid } from 'nanoid'
 import type { Player, Room, PlayerRole, PlayerColor } from './types.js'
-
+import { canTransition } from './stateMachine.js'
+import type { GamePhase } from './types.js'
 // Master rooms map — everything lives here
 // roomId => {
 //   id, code, hostId, phase, players: Map(socketId => playerObj), createdAt
 // }
+const PHASE_DURATIONS: Record<GamePhase, number | null> = {
+  lobby: null,
+  role_reveal: 4,
+  coding: 90,
+  discussion: 45,
+  voting: 20,
+  result: 6,
+}
 
 const rooms = new Map<string, Room>()
 
@@ -79,6 +88,7 @@ function removePlayer(socketId: string) {
 
     if (room.players.size === 0) {
       rooms.delete(roomId)
+      clearRoomTimer(roomId)
       return { roomId, room: null, newHost: null }
     }
 
@@ -159,6 +169,123 @@ function assignRoles(roomId: string): Map<string, PlayerRole> | null {
 
   return assignments
 }
+const activeTimers = new Map<string, NodeJS.Timeout>()
+
+function transitionPhase(
+  roomId: string,
+  to: GamePhase,
+  io: import('socket.io').Server
+): boolean {
+  const room = rooms.get(roomId)
+  if (!room) return false
+
+  if (!canTransition(room.phase, to)) {
+    console.warn(`Blocked invalid transition: ${room.phase} → ${to} in room ${roomId}`)
+    return false
+  }
+
+  // clear any leftover timer from the previous phase
+  clearRoomTimer(roomId)
+
+  room.phase = to
+
+  // broadcast the new phase to everyone, with the duration so clients can render a countdown
+  const duration = PHASE_DURATIONS[to]
+  io.to(roomId).emit('phase_changed', {
+    phase: to,
+    round: room.round,
+    duration,
+  })
+
+  // if this phase has an automatic timeout, schedule the next transition
+  if (duration !== null) {
+    scheduleAutoAdvance(roomId, to, duration, io)
+  }
+
+  return true
+}
+
+// in scheduleAutoAdvance, server/src/rooms.ts — emit immediately before the interval starts
+function scheduleAutoAdvance(
+  roomId: string,
+  currentPhase: GamePhase,
+  seconds: number,
+  io: import('socket.io').Server
+) {
+  let remaining = seconds
+
+  // emit the starting value right away
+  io.to(roomId).emit('timer_tick', { seconds: remaining })
+
+  const interval = setInterval(() => {
+    remaining -= 1
+    io.to(roomId).emit('timer_tick', { seconds: remaining })
+
+    if (remaining <= 0) {
+      clearInterval(interval)
+      activeTimers.delete(roomId)
+      advanceFromPhase(roomId, currentPhase, io)
+    }
+  }, 1000)
+
+  activeTimers.set(roomId, interval)
+}
+
+// decides where to go NEXT based on the current phase + game state
+function advanceFromPhase(
+  roomId: string,
+  currentPhase: GamePhase,
+  io: import('socket.io').Server
+) {
+  const room = rooms.get(roomId)
+  if (!room) return
+
+  // Guard: make sure we are still in the phase that scheduled this timer
+  if (room.phase !== currentPhase) return
+
+  switch (currentPhase) {
+    case 'role_reveal':
+      transitionPhase(roomId, 'coding', io)
+      break
+    case 'coding':
+      transitionPhase(roomId, 'discussion', io)
+      break
+    case 'discussion':
+      transitionPhase(roomId, 'voting', io)
+      break
+    case 'voting':
+      transitionPhase(roomId, 'result', io)
+      break
+    case 'result':
+      if (room.round < 4) {
+        room.round += 1
+        transitionPhase(roomId, 'coding', io)
+      } else {
+        transitionPhase(roomId, 'lobby', io)
+      }
+      break
+  }
+}
+
+function clearRoomTimer(roomId: string) {
+  const timer = activeTimers.get(roomId)
+  if (timer) {
+    clearInterval(timer)
+    activeTimers.delete(roomId)
+  }
+}
+
+// called by the EMERGENCY button — force-skip coding straight to discussion
+function triggerEmergency(
+  roomId: string,
+  io: import('socket.io').Server
+): boolean {
+  const room = rooms.get(roomId)
+  if (!room || room.phase !== 'coding') return false
+
+  return transitionPhase(roomId, 'discussion', io)
+}
+// in scheduleAutoAdvance, server/src/rooms.ts — emit immediately before the interval starts
 
 export {
   createRoom,
@@ -167,5 +294,8 @@ export {
   getRoom,
   getRoomBySocketId,
   serializeRoom,
-  assignRoles
+  assignRoles,
+  transitionPhase,
+  clearRoomTimer,
+  triggerEmergency
 }

@@ -7,7 +7,9 @@ import {
   removePlayer,
   getRoom,
   serializeRoom,
-  assignRoles
+  assignRoles,
+  transitionPhase,
+  triggerEmergency
 } from './rooms.js'
 
 const PORT = process.env.PORT || 3001
@@ -81,36 +83,29 @@ io.on('connection', (socket: Socket) => {
 
   // Start GAME
 
-  socket.on('start_game', ({ roomId }: { roomId: string }) => {
+
+
+  socket.on('start_game', ({ roomId }) => {
     const room = getRoom(roomId)
     if (!room) return
-    if (room.hostId !== socket.id) return   // only host can start
-    if (room.players.size < 2) return       // need at least 2
+    if (room.hostId !== socket.id) return
+    if (room.players.size < 2) return
 
-    // 1. assign roles — returns Map<socketId, role>
     const roleAssignments = assignRoles(roomId)
     if (!roleAssignments) return
 
-    // 2. update room phase
-    room.phase = 'role_reveal'
-    room.round = 1
-
-    // 3. tell each player their role PRIVATELY
     roleAssignments.forEach((role, socketId) => {
       io.to(socketId).emit('role_assigned', { role })
-      //    ^^^^^^^^^^
-      // io.to(socketId) targets ONE specific socket
-      // same as socket.emit but from outside the socket's own handler
     })
 
-    // 4. tell EVERYONE the game has started and phase changed
-    // note: we send the room WITHOUT role info — serializeRoom never includes roles
-    io.to(roomId).emit('game_started', {
-      room: serializeRoom(room)
-    })
+    io.to(roomId).emit('game_started', { room: serializeRoom(room) })
 
-    console.log(`Game started in room ${roomId} — saboteur is ${[...roleAssignments.entries()].find(([, r]) => r === 'saboteur')?.[0]
-      }`)
+    // hand off to the state machine — it owns everything from here
+    transitionPhase(roomId, 'role_reveal', io)
+  })
+
+  socket.on('emergency', ({ roomId }) => {
+    triggerEmergency(roomId, io)
   })
 
   // ─── DISCONNECTING ─────────────────────────────────────────
