@@ -1,7 +1,22 @@
-import { nanoid } from 'nanoid'
+import { customAlphabet } from 'nanoid'
+const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', 6)
 import type { Player, Room, PlayerRole, PlayerColor } from './types.js'
 import { canTransition } from './stateMachine.js'
-import type { GamePhase } from './types.js'
+import type { GamePhase, Snippet } from './types.js'
+
+export const DEFAULT_SNIPPET: Snippet = {
+  id: 'snip-1',
+  title: 'Two Sum',
+  code: `def two_sum(nums, target):
+    # TODO: Implement two sum
+    pass
+`,
+  testCases: [
+    { id: 't1', name: 'Base case', assertion: 'two_sum([2, 7, 11, 15], 9) == [0, 1]' },
+    { id: 't2', name: 'Negative numbers', assertion: 'two_sum([-1, -2, -3, -4, -5], -8) == [2, 4]' },
+    { id: 't3', name: 'Zeroes', assertion: 'two_sum([0, 4, 3, 0], 0) == [0, 3]' }
+  ]
+}
 // Master rooms map — everything lives here
 // roomId => {
 //   id, code, hostId, phase, players: Map(socketId => playerObj), createdAt
@@ -18,8 +33,8 @@ const PHASE_DURATIONS: Record<GamePhase, number | null> = {
 const rooms = new Map<string, Room>()
 
 function generateRoomId(): string {
-  // 6 uppercase chars — easy to share verbally: "join room XKCD42"
-  return nanoid(6).toUpperCase()
+  // 6 uppercase alphanumeric chars — easy to share verbally: "join room XKCD42"
+  return nanoid()
 }
 
 function createRoom(hostSocket: any, nickname: string) {
@@ -189,12 +204,19 @@ function transitionPhase(
 
   room.phase = to
 
+  // Set the snippet if transitioning to coding phase
+  if (to === 'coding') {
+    room.currentSnippet = DEFAULT_SNIPPET
+    room.code = DEFAULT_SNIPPET.code
+  }
+
   // broadcast the new phase to everyone, with the duration so clients can render a countdown
   const duration = PHASE_DURATIONS[to]
   io.to(roomId).emit('phase_changed', {
     phase: to,
     round: room.round,
     duration,
+    snippet: room.currentSnippet
   })
 
   // if this phase has an automatic timeout, schedule the next transition

@@ -12,6 +12,19 @@ export interface Player {
   role?: PlayerRole   // optional — only set after game starts, never sent to clients
 }
 
+export interface TestCase {
+  id: string
+  name: string
+  assertion: string
+}
+
+export interface Snippet {
+  id: string
+  title: string
+  code: string
+  testCases: TestCase[]
+}
+
 export interface Room {
   id: string
   hostId: string
@@ -20,4 +33,5 @@ export interface Room {
   round: number
   players: Map<string, Player>
   createdAt: number
+  currentSnippet?: Snippet
 }

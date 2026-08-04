@@ -11,6 +11,7 @@ import {
   transitionPhase,
   triggerEmergency
 } from './rooms.js'
+import { runTests } from './evaluator.js'
 
 const PORT = process.env.PORT || 3001
 
@@ -21,6 +22,9 @@ const io = new Server(server, {
     origin: process.env.CLIENT_URL || 'http://localhost:5173'
   }
 })
+
+// debounce map — one timer per room to avoid running tests on every keystroke
+const evalTimers = new Map<string, NodeJS.Timeout>()
 
 io.on('connection', (socket: Socket) => {
   console.log(`Socket connected: ${socket.id}`)
@@ -82,9 +86,6 @@ io.on('connection', (socket: Socket) => {
   )
 
   // Start GAME
-
-
-
   socket.on('start_game', ({ roomId }) => {
     const room = getRoom(roomId)
     if (!room) return
@@ -140,6 +141,49 @@ io.on('connection', (socket: Socket) => {
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`)
   })
+
+  socket.on('code_change', async ({
+  roomId,
+  code,
+}: {
+  roomId: string
+  code: string
+}) => {
+  const room = getRoom(roomId)
+  if (!room) return
+  if (room.phase !== 'coding') return
+
+  // only the saboteur can change code — validate server-side
+  const player = room.players.get(socket.id)
+  if (!player || player.role !== 'saboteur') return
+
+  // update the canonical code in room state
+  room.code = code
+
+  // broadcast updated code to all OTHER players (not back to sender)
+  socket.to(roomId).emit('code_updated', { code })
+
+  // debounce test evaluation — run tests 800ms after the last keystroke
+  // avoids spawning a Python process on every single character typed
+  const existing = evalTimers.get(roomId)
+  if (existing) clearTimeout(existing)
+
+  const timer = setTimeout(async () => {
+    evalTimers.delete(roomId)
+    if (!room.currentSnippet) return
+
+    const results = await runTests(code, room.currentSnippet.testCases)
+
+    // broadcast to everyone — all players see the same test panel
+    io.to(roomId).emit('test_results', { results })
+
+    // log for debugging
+    const passed = results.filter(r => r.passed).length
+    console.log(`Room ${roomId} tests: ${passed}/${results.length} passing`)
+  }, 800)
+
+  evalTimers.set(roomId, timer)
+})
 })
 
 server.listen(PORT, () => {

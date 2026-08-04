@@ -40,14 +40,18 @@ export function useSocketEvents() {
       setRole(role)
     })
 
-    socket.on('phase_changed', ({ phase, round, duration }: {
+    socket.on('phase_changed', ({ phase, round, duration, snippet }: {
       phase: GamePhase
       round: number
       duration: number | null
+      snippet?: { topic: string; code: string }
     }) => {
       setPhase(phase)
       setRound(round)
       setTimer(duration ?? 0)
+      if (snippet) {
+        setCode(snippet.code)
+      }
     })
 
     socket.on('timer_tick', ({ seconds }: { seconds: number }) => {

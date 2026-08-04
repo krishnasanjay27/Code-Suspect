@@ -9,6 +9,7 @@ export default function RoleReveal() {
   const navigate = useNavigate()
   const role = useGameStore(s => s.role)
   const player = useGameStore(s => s.player)
+  const phase = useGameStore(s => s.phase)
 
   const [countdown, setCountdown] = useState(3)
   const [visible, setVisible] = useState(false)
@@ -42,15 +43,12 @@ export default function RoleReveal() {
     return () => clearInterval(interval)
   }, [])
 
-  // navigate when countdown hits 0
+  // navigate when server transitions to coding phase
   useEffect(() => {
-    if (countdown === 0) {
-      const t = setTimeout(() => {
-        navigate(`/room/${roomId}/game`)
-      }, 800) // small buffer so player sees "0" briefly
-      return () => clearTimeout(t)
+    if (phase === 'coding') {
+      navigate(`/room/${roomId}/game`)
     }
-  }, [countdown])
+  }, [phase, navigate, roomId])
 
   if (!role || !player) return null
 
@@ -191,14 +189,6 @@ export default function RoleReveal() {
             ))}
           </div>
         </div>
-
-        {/* Skip button */}
-        <button
-          onClick={() => navigate(`/room/${roomId}/game`)}
-          className="text-[#444] hover:text-[#888] text-[10px] tracking-[0.3em] uppercase transition-colors"
-        >
-          Skip →
-        </button>
 
       </div>
     </div>
